@@ -1,0 +1,21 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    background: #111;
+}
+
+#game {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#minimap {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    width: 200px;
+    height: 200px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 2px solid #fff;
+}
