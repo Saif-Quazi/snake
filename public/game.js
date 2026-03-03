@@ -8,144 +8,122 @@ canvas.height = window.innerHeight;
 
 const MAP_SIZE = 5000;
 
-let player = {
-    id: Math.random().toString(36).substr(2, 9),
-    x: MAP_SIZE / 2,
-    y: MAP_SIZE / 2,
-    angle: 0,
-    speed: 3,
-    body: []
-};
-
-let peers = {};
-let dataChannels = {};
-
-const ws = new WebSocket(
-    location.protocol === "https:"
-        ? "wss://" + location.host
-        : "ws://" + location.host
+let socket = new WebSocket(
+  location.protocol === "https:"
+    ? "wss://" + location.host
+    : "ws://" + location.host
 );
 
-let pc = new RTCPeerConnection();
+let username = prompt("Enter username") || "Player";
 
-pc.ondatachannel = (event) => {
-    const channel = event.channel;
-    channel.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        peers[data.id] = data;
-    };
+let players = {};
+let foods = {};
+let myId = null;
+
+socket.onopen = () => {
+  socket.send(JSON.stringify({
+    type: "join",
+    username
+  }));
 };
 
-function createDataChannel() {
-    const channel = pc.createDataChannel("game");
-    channel.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        peers[data.id] = data;
-    };
-    return channel;
-}
+socket.onmessage = (msg) => {
+  const state = JSON.parse(msg.data);
+  players = state.players;
+  foods = state.foods;
 
-let dataChannel = createDataChannel();
-
-ws.onmessage = async (msg) => {
-    const data = JSON.parse(msg.data);
-
-    if (data.offer) {
-        await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        ws.send(JSON.stringify({ answer }));
-    }
-
-    if (data.answer) {
-        await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-    }
-
-    if (data.candidate) {
-        await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-    }
+  if (!myId && socket.readyState === 1) {
+    myId = Object.keys(players).find(id =>
+      players[id].username === username
+    );
+  }
 };
-
-pc.onicecandidate = (event) => {
-    if (event.candidate) {
-        ws.send(JSON.stringify({ candidate: event.candidate }));
-    }
-};
-
-async function initWebRTC() {
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    ws.send(JSON.stringify({ offer }));
-}
-
-initWebRTC();
 
 window.addEventListener("mousemove", (e) => {
-    const dx = e.clientX - canvas.width / 2;
-    const dy = e.clientY - canvas.height / 2;
-    player.angle = Math.atan2(dy, dx);
+  if (!players[myId]) return;
+
+  const dx = e.clientX - canvas.width / 2;
+  const dy = e.clientY - canvas.height / 2;
+  const angle = Math.atan2(dy, dx);
+
+  socket.send(JSON.stringify({
+    type: "move",
+    angle
+  }));
 });
 
-function update() {
-    player.x += Math.cos(player.angle) * player.speed;
-    player.y += Math.sin(player.angle) * player.speed;
+function drawSnake(p, camX, camY, color) {
+  ctx.fillStyle = color;
+  for (let segment of p.body) {
+    ctx.beginPath();
+    ctx.arc(segment.x - camX, segment.y - camY, 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
-    player.body.push({ x: player.x, y: player.y });
-    if (player.body.length > 100) player.body.shift();
-
-    if (dataChannel.readyState === "open") {
-        dataChannel.send(JSON.stringify(player));
-    }
+  ctx.fillStyle = "#fff";
+  ctx.fillText(p.username, p.x - camX - 20, p.y - camY - 20);
 }
 
 function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const camX = player.x - canvas.width / 2;
-    const camY = player.y - canvas.height / 2;
+  if (!players[myId]) return;
 
-    ctx.fillStyle = "#222";
-    ctx.fillRect(-camX, -camY, MAP_SIZE, MAP_SIZE);
+  let me = players[myId];
 
-    drawSnake(player, camX, camY, "lime");
+  const camX = me.x - canvas.width / 2;
+  const camY = me.y - canvas.height / 2;
 
-    Object.values(peers).forEach(p => {
-        drawSnake(p, camX, camY, "red");
-    });
+  ctx.fillStyle = "#222";
+  ctx.fillRect(-camX, -camY, MAP_SIZE, MAP_SIZE);
 
-    drawMiniMap();
+  // Draw food
+  ctx.fillStyle = "orange";
+  for (let f of foods) {
+    ctx.beginPath();
+    ctx.arc(f.x - camX, f.y - camY, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  for (let id in players) {
+    drawSnake(
+      players[id],
+      camX,
+      camY,
+      id === myId ? "lime" : "red"
+    );
+  }
+
+  drawMiniMap(me);
 }
 
-function drawSnake(snake, camX, camY, color) {
-    ctx.fillStyle = color;
-    snake.body.forEach(segment => {
-        ctx.beginPath();
-        ctx.arc(segment.x - camX, segment.y - camY, 5, 0, Math.PI * 2);
-        ctx.fill();
-    });
-}
+function drawMiniMap(me) {
+  miniCtx.clearRect(0, 0, minimap.width, minimap.height);
 
-function drawMiniMap() {
-    miniCtx.clearRect(0, 0, minimap.width, minimap.height);
+  const scale = minimap.width / MAP_SIZE;
 
-    miniCtx.fillStyle = "#444";
-    miniCtx.fillRect(0, 0, minimap.width, minimap.height);
+  miniCtx.fillStyle = "#444";
+  miniCtx.fillRect(0, 0, minimap.width, minimap.height);
 
-    const scale = minimap.width / MAP_SIZE;
+  miniCtx.fillStyle = "orange";
+  for (let f of foods) {
+    miniCtx.fillRect(f.x * scale, f.y * scale, 2, 2);
+  }
 
-    miniCtx.fillStyle = "lime";
-    miniCtx.fillRect(player.x * scale, player.y * scale, 5, 5);
-
-    miniCtx.fillStyle = "red";
-    Object.values(peers).forEach(p => {
-        miniCtx.fillRect(p.x * scale, p.y * scale, 5, 5);
-    });
+  for (let id in players) {
+    miniCtx.fillStyle = id === myId ? "lime" : "red";
+    miniCtx.fillRect(
+      players[id].x * scale,
+      players[id].y * scale,
+      4,
+      4
+    );
+  }
 }
 
 function loop() {
-    update();
-    draw();
-    requestAnimationFrame(loop);
+  draw();
+  requestAnimationFrame(loop);
 }
 
 loop();
