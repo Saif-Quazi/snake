@@ -126,7 +126,7 @@ function draw() {
   ctx.fillRect(-camX, -camY, MAP_SIZE, MAP_SIZE);
 
   ctx.strokeStyle = "#555";
-  ctx.lineWidth = 5;
+  ctx.lineWidth = 4;
   ctx.strokeRect(-camX, -camY, MAP_SIZE, MAP_SIZE);
 
   ctx.fillStyle = "orange";
@@ -138,20 +138,48 @@ function draw() {
 
   for (let id in players) {
     const p = players[id];
-    const radius = 5 + p.length * 0.05;
+    const baseRadius = 6 + p.length * 0.03;
+    const segments = Math.floor(p.length / 2);
+
+    ctx.fillStyle = id === myId ? "lime" : "red";
+
+    for (let i = segments; i > 0; i--) {
+      const offset = i * baseRadius * 0.9;
+      const bx = p.x - Math.cos(p.angle) * offset;
+      const by = p.y - Math.sin(p.angle) * offset;
+
+      ctx.beginPath();
+      ctx.arc(bx - camX, by - camY, baseRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     ctx.beginPath();
-    ctx.fillStyle = id === myId ? "lime" : "red";
-    ctx.arc(p.x - camX, p.y - camY, radius, 0, Math.PI * 2);
+    ctx.arc(p.x - camX, p.y - camY, baseRadius, 0, Math.PI * 2);
     ctx.fill();
 
-    // head indicator
-    ctx.beginPath();
+    const eyeOffsetX = Math.cos(p.angle) * baseRadius * 0.5;
+    const eyeOffsetY = Math.sin(p.angle) * baseRadius * 0.5;
+
+    const sideX = Math.cos(p.angle + Math.PI / 2) * baseRadius * 0.4;
+    const sideY = Math.sin(p.angle + Math.PI / 2) * baseRadius * 0.4;
+
     ctx.fillStyle = "white";
+
+    ctx.beginPath();
     ctx.arc(
-      p.x - camX + Math.cos(p.angle) * radius * 0.6,
-      p.y - camY + Math.sin(p.angle) * radius * 0.6,
-      radius * 0.4,
+      p.x - camX + eyeOffsetX + sideX,
+      p.y - camY + eyeOffsetY + sideY,
+      baseRadius * 0.25,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(
+      p.x - camX + eyeOffsetX - sideX,
+      p.y - camY + eyeOffsetY - sideY,
+      baseRadius * 0.25,
       0,
       Math.PI * 2
     );
@@ -161,7 +189,6 @@ function draw() {
   ctx.restore();
   drawMiniMap(me);
 }
-
 function drawMiniMap(me) {
   miniCtx.clearRect(0, 0, minimap.width, minimap.height);
   const scale = minimap.width / MAP_SIZE;
