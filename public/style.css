@@ -1,62 +1,84 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    background: #111;
+}
+
+#game {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#minimap {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    width: 200px;
+    height: 200px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 2px solid #fff;
+}
+
 #menu {
-  position: fixed;
-  inset: 0;
-  background: linear-gradient(135deg, #111, #1a1a1a);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 10;
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(135deg, #111, #1a1a1a);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
 }
 
 .menu-box {
-  background: #181818;
-  padding: 40px;
-  border-radius: 12px;
-  width: 300px;
-  text-align: center;
-  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    background: #181818;
+    padding: 40px;
+    border-radius: 12px;
+    width: 300px;
+    text-align: center;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
 }
 
 .menu-box h1 {
-  margin-bottom: 20px;
-  font-weight: 600;
+    margin-bottom: 20px;
+    font-weight: 600;
 }
 
 #nameInput {
-  width: 100%;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #333;
-  background: #222;
-  color: white;
-  font-size: 14px;
-  outline: none;
-  margin-bottom: 15px;
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #222;
+    color: white;
+    font-size: 14px;
+    outline: none;
+    margin-bottom: 15px;
 }
 
 #nameInput:focus {
-  border-color: #4caf50;
+    border-color: #4caf50;
 }
 
 #playBtn {
-  width: 100%;
-  padding: 10px;
-  border-radius: 8px;
-  border: none;
-  background: #4caf50;
-  color: white;
-  font-size: 14px;
-  cursor: pointer;
-  transition: 0.2s ease;
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    background: #4caf50;
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+    transition: 0.2s ease;
 }
 
 #playBtn:hover {
-  background: #43a047;
+    background: #43a047;
 }
 
 #errorMsg {
-  color: #ff5252;
-  font-size: 12px;
-  margin-top: 10px;
-  min-height: 16px;
+    color: #ff5252;
+    font-size: 12px;
+    margin-top: 10px;
+    min-height: 16px;
 }
