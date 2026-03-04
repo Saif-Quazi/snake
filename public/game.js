@@ -1,129 +1,36 @@
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
-const minimap = document.getElementById("minimap");
-const miniCtx = minimap.getContext("2d");
+const menu = document.getElementById("menu");
+const input = document.getElementById("nameInput");
+const playBtn = document.getElementById("playBtn");
+const errorMsg = document.getElementById("errorMsg");
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+input.value = localStorage.getItem("snake_username") || "";
 
-const MAP_SIZE = 5000;
+function sanitizeName(value) {
+  // Remove weird chars, allow letters + numbers only
+  value = value.replace(/[^a-zA-Z0-9]/g, "");
+  return value;
+}
 
-let socket = new WebSocket(
-  location.protocol === "https:"
-    ? "wss://" + location.host
-    : "ws://" + location.host
-);
-
-let username = prompt("Enter username") || "Player";
-
-let players = {};
-let foods = {};
-let myId = null;
-
-socket.onopen = () => {
-  socket.send(JSON.stringify({
-    type: "join",
-    username
-  }));
-};
-
-socket.onmessage = (msg) => {
-  const state = JSON.parse(msg.data);
-  players = state.players;
-  foods = state.foods;
-
-  if (!myId && socket.readyState === 1) {
-    myId = Object.keys(players).find(id =>
-      players[id].username === username
-    );
-  }
-};
-
-window.addEventListener("mousemove", (e) => {
-  if (!players[myId]) return;
-
-  const dx = e.clientX - canvas.width / 2;
-  const dy = e.clientY - canvas.height / 2;
-  const angle = Math.atan2(dy, dx);
-
-  socket.send(JSON.stringify({
-    type: "move",
-    angle
-  }));
+input.addEventListener("input", () => {
+  input.value = sanitizeName(input.value);
 });
 
-function drawSnake(p, camX, camY, color) {
-  ctx.fillStyle = color;
-  for (let segment of p.body) {
-    ctx.beginPath();
-    ctx.arc(segment.x - camX, segment.y - camY, 6, 0, Math.PI * 2);
-    ctx.fill();
+playBtn.addEventListener("click", () => {
+  let name = sanitizeName(input.value.trim());
+
+  if (name.length < 4) {
+    errorMsg.textContent = "Minimum 4 characters.";
+    return;
   }
 
-  ctx.fillStyle = "#fff";
-  ctx.fillText(p.username, p.x - camX - 20, p.y - camY - 20);
-}
-
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  if (!players[myId]) return;
-
-  let me = players[myId];
-
-  const camX = me.x - canvas.width / 2;
-  const camY = me.y - canvas.height / 2;
-
-  ctx.fillStyle = "#222";
-  ctx.fillRect(-camX, -camY, MAP_SIZE, MAP_SIZE);
-
-  // Draw food
-  ctx.fillStyle = "orange";
-  for (let f of foods) {
-    ctx.beginPath();
-    ctx.arc(f.x - camX, f.y - camY, 4, 0, Math.PI * 2);
-    ctx.fill();
+  if (name.length > 16) {
+    errorMsg.textContent = "Maximum 16 characters.";
+    return;
   }
 
-  for (let id in players) {
-    drawSnake(
-      players[id],
-      camX,
-      camY,
-      id === myId ? "lime" : "red"
-    );
-  }
+  username = name;
+  localStorage.setItem("snake_username", username);
 
-  drawMiniMap(me);
-}
-
-function drawMiniMap(me) {
-  miniCtx.clearRect(0, 0, minimap.width, minimap.height);
-
-  const scale = minimap.width / MAP_SIZE;
-
-  miniCtx.fillStyle = "#444";
-  miniCtx.fillRect(0, 0, minimap.width, minimap.height);
-
-  miniCtx.fillStyle = "orange";
-  for (let f of foods) {
-    miniCtx.fillRect(f.x * scale, f.y * scale, 2, 2);
-  }
-
-  for (let id in players) {
-    miniCtx.fillStyle = id === myId ? "lime" : "red";
-    miniCtx.fillRect(
-      players[id].x * scale,
-      players[id].y * scale,
-      4,
-      4
-    );
-  }
-}
-
-function loop() {
-  draw();
-  requestAnimationFrame(loop);
-}
-
-loop();
+  menu.style.display = "none";
+  startGame();
+});
