@@ -1,6 +1,6 @@
 const express = require("express");
-const http = require("http");
 const WebSocket = require("ws");
+const http = require("http");
 
 const app = express();
 app.use(express.static("public"));
@@ -8,143 +8,105 @@ app.use(express.static("public"));
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const MAP_SIZE = 5000;
-const FOOD_COUNT = 300;
-const BORDER = 20;
+const PORT = process.env.PORT || 3000;
 
-let players = {};
-let foods = [];
+const WORLD_SIZE = 5000;
 
-function randomPos() {
-  return Math.random() * (MAP_SIZE - 200) + 100;
+const players = {};
+const food = [];
+
+function rand(min, max) {
+    return Math.random() * (max - min) + min;
 }
 
-function spawnFood(x = null, y = null) {
-  foods.push({
-    id: Math.random().toString(36).substr(2, 9),
-    x: x ?? randomPos(),
-    y: y ?? randomPos()
-  });
+function spawnFood() {
+    if (food.length > 300) return;
+
+    food.push({
+        id: Date.now() + Math.random(),
+        x: rand(0, WORLD_SIZE),
+        y: rand(0, WORLD_SIZE)
+    });
 }
 
-for (let i = 0; i < FOOD_COUNT; i++) spawnFood();
+setInterval(spawnFood, 100);
 
-function createPlayer(id, username) {
-  return {
-    id,
-    username,
-    x: randomPos(),
-    y: randomPos(),
-    angle: 0,
-    speed: 2.5,
-    body: [],
-    length: 40,
-    dead: false
-  };
-}
+wss.on("connection", (ws) => {
 
-function distance(a, b) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
+    const id = Math.random().toString(36).substr(2, 9);
 
-function killPlayer(id) {
-  const p = players[id];
-  if (!p) return;
+    players[id] = {
+        id,
+        x: rand(0, WORLD_SIZE),
+        y: rand(0, WORLD_SIZE),
+        dirX: 0,
+        dirY: 0,
+        size: 10,
+        segments: []
+    };
 
-  // Mass drop
-  for (let segment of p.body) {
-    if (Math.random() < 0.4) {
-      spawnFood(segment.x, segment.y);
-    }
-  }
+    ws.send(JSON.stringify({
+        type: "init",
+        id,
+        world: WORLD_SIZE
+    }));
 
-  // Respawn
-  players[id] = createPlayer(id, p.username);
-}
+    ws.on("message", (msg) => {
 
-function gameLoop() {
-  for (let id in players) {
-    let p = players[id];
+        let data;
+        try { data = JSON.parse(msg); } catch { return; }
 
-    p.x += Math.cos(p.angle) * p.speed;
-    p.y += Math.sin(p.angle) * p.speed;
+        if (data.type === "move") {
+            const p = players[id];
+            if (!p) return;
 
-    p.body.push({ x: p.x, y: p.y });
-    if (p.body.length > p.length) p.body.shift();
-
-    // Edge of map kill
-    if (
-      p.x < BORDER ||
-      p.y < BORDER ||
-      p.x > MAP_SIZE - BORDER ||
-      p.y > MAP_SIZE - BORDER
-    ) {
-      killPlayer(id);
-      continue;
-    }
-
-    // Food collision (normal growth)
-    foods = foods.filter(f => {
-      if (distance(p, f) < 15) {
-        p.length += 5;
-        return false;
-      }
-      return true;
+            p.dirX = data.x;
+            p.dirY = data.y;
+        }
     });
 
-    // Player collision (head to body)
-    for (let otherId in players) {
-      let other = players[otherId];
-      if (otherId === id) continue;
-
-      for (let segment of other.body) {
-        if (distance(p, segment) < 8) {
-          killPlayer(id);
-          break;
-        }
-      }
-    }
-  }
-
-  broadcast();
-}
-
-function broadcast() {
-  const state = JSON.stringify({
-    players,
-    foods
-  });
-
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(state);
-    }
-  });
-}
-
-wss.on("connection", ws => {
-  let playerId = Math.random().toString(36).substr(2, 9);
-
-  ws.on("message", msg => {
-    const data = JSON.parse(msg);
-
-    if (data.type === "join") {
-      players[playerId] = createPlayer(playerId, data.username);
-    }
-
-    if (data.type === "move") {
-      if (players[playerId]) {
-        players[playerId].angle = data.angle;
-      }
-    }
-  });
-
-  ws.on("close", () => {
-    delete players[playerId];
-  });
+    ws.on("close", () => {
+        delete players[id];
+    });
 });
 
-setInterval(gameLoop, 1000 / 60);
+const TICK = 50;
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log("Server running"));
+setInterval(() => {
+
+    for (const id in players) {
+
+        const p = players[id];
+
+        p.x += p.dirX * 4;
+        p.y += p.dirY * 4;
+
+        if (p.x < 0) p.x = 0;
+        if (p.y < 0) p.y = 0;
+        if (p.x > WORLD_SIZE) p.x = WORLD_SIZE;
+        if (p.y > WORLD_SIZE) p.y = WORLD_SIZE;
+
+        p.segments.unshift({ x: p.x, y: p.y });
+
+        if (p.segments.length > p.size) {
+            p.segments.pop();
+        }
+    }
+
+    const packet = JSON.stringify({
+        type: "state",
+        players,
+        food
+    });
+
+    wss.clients.forEach(c => {
+        if (c.readyState === WebSocket.OPEN) {
+            c.send(packet);
+        }
+    });
+
+}, TICK);
+
+server.listen(PORT, () => {
+    console.log("Server running on", PORT);
+});
